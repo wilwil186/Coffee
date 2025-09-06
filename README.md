@@ -71,7 +71,6 @@ pip install -r requirements.txt
 |---|---|---:|---:|---:|---:|
 | Lasso | `models/lasso_price.joblib` | **5.4913** | **3.9316** | **3.5788** | **52** |
 
-> _Notas_: el flujo **infirió** metadatos ausentes del artefacto (p. ej. `y_col='price'`, `group_cols=['country','type']`) a partir del nombre/convenciones, y luego ejecutó la evaluación sobre el holdout 2020.
 
 Si ya corriste `Inferencia.ipynb` para **consumption** y **profit**, agrega aquí sus tablas con las métricas análogas (RMSE/MAE/sMAPE/R²) y los artefactos elegidos.
 
@@ -123,6 +122,3 @@ Propuesta de valor rápido:
 - **Modelos**: probar **LightGBM/XGBoost** y **prophet** para series por país/tipo.
 - **Intervalos**: PI dependientes de varianza del residuo por segmento (no solo absolutos).
 - **MLOps**: añadir pruebas, `dvc` para data/artefactos y CI para validar notebooks.
-
-## 📄 Licencia
-Uso educativo/demostrativo. Ajusta a tu licencia preferida si publicarás.
