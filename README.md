@@ -111,16 +111,6 @@ if "market_share" not in df.columns and {"year","consumption"} <= set(df.columns
 
 > Nota: estos valores son los **obtenidos en tu `Evaluacion.ipynb`**. Si cambias features o particiones, las métricas variarán. Mantén la comparación con baselines para validar mejora.
 
-### Celda para imprimir métricas
-```python
-print("📊 Métricas de evaluación para el objetivo:", TARGET.upper())
-for k, v in ev["metrics"].items():
-    if isinstance(v, float):
-        print(f"  {k:<8}: {v:,.4f}")
-    else:
-        print(f"  {k:<8}: {v}")
-```
-
 ---
 
 ## 🚀 Cómo replicar
