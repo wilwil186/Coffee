@@ -2,7 +2,7 @@
   "target": "price",
   "metrics": {},
   "best_artifact": "models/ridge_price.joblib",
-  "generated_at": "2025-09-06T17:07:44",
+  "generated_at": "2025-09-06T17:16:15",
   "metrics_baselines": {
     "last_value": {
       "RMSE": 9.205001068115235,
