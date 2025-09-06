@@ -5,12 +5,14 @@
 ---
 
 ## 🎯 Contexto del reto
-La empresa busca aprovechar datos históricos (1990–2020) de consumo doméstico de café por país y tipo para **identificar tendencias**, **estimar precios/útiles futuros** y **apoyar decisiones comerciales**. La solución exige:
-- **Análisis de la información**
-- **Solución analítica a problemas de negocio**
-- **Implementación y evaluación**
-- **Presentación de resultados**
-- *(BONUS)* Propuesta de **IA generativa/LLM**
+Datos históricos (1990–2020) de consumo doméstico de café por **país** y **tipo**. Objetivo: **tendencias**, **rangos de precios futuros** y **métricas de negocio** (ingresos/utilidad) para apoyar decisiones.
+
+**Requisitos cubiertos:**
+- ✅ **Análisis de la información** (EDA)
+- ✅ **Solución analítica de negocio** (Inferencia: `price`, `consumption`, `profit`)
+- ✅ **Implementación y evaluación** (Evaluación)
+- ✅ **Presentación de resultados** (este README + figuras)
+- ⭐ **BONUS**: propuesta de **IA generativa/LLM** (abajo)
 
 ---
 
@@ -18,154 +20,156 @@ La empresa busca aprovechar datos históricos (1990–2020) de consumo doméstic
 
 ```
 .
-├── EDA.ipynb               # Limpieza, integración de fuentes, KPIs de negocio y visualización
-├── Inferencia.ipynb        # Features, partición temporal, modelos y predicciones
-├── Evaluacion.ipynb        # Holdout/val/test y métricas finales por objetivo
+├── EDA.ipynb
+├── Inferencia.ipynb
+├── Evaluacion.ipynb
 ├── utils/
-│   ├── io.py               # Utilidades de carga/transformación (wide→long, etc.)
-│   └── metrics.py          # Métricas de negocio y evaluación (MAE, RMSE, sMAPE, etc.)
+│   ├── io.py
+│   └── metrics.py
 ├── data/
-│   └── coffee_clean.csv    # Datos limpios generados por el EDA
-├── models/                 # Artefactos .joblib guardados por Inferencia
-├── predicciones/           # CSVs con predicciones por objetivo/horizonte
-├── results/                # Salidas de evaluación/figuras (si aplica)
-├── coffee_db.csv           # Fuente en bruto (consumo por país y tipo, años anchos)
-├── precios.csv             # Precios diarios (se anualizan en el EDA)
+│   └── coffee_clean.csv      # (se genera desde EDA.ipynb)
+├── models/                   # artefactos .joblib
+├── predicciones/             # CSVs de predicciones
+├── results/                  # figuras (opcional)
+├── coffee_db.csv             # datos fuente (wide)
+├── precios.csv               # precios diarios (se anualizan)
 └── requirements.txt
 ```
 
 ---
 
-## 🧹 ¿Qué hace el EDA?
-El cuaderno **`EDA.ipynb`** deja el dataset listo para modelar y para comunicar resultados de negocio.
+## 🧹 EDA — limpieza, integración y KPIs
 
-**1) Normalización / preparación**
-- Unpivot: convierte años en columnas (`1990/91`, `1991/92`, …) a una sola columna `year` (entero).
-- Estandariza nombres: `Country`→`country`, `Coffee type`→`type`, etc.
-- Control de calidad: tipos, nulos y duplicados.
+### 1) Limpieza y normalización
+- Convierte formato **wide → long**: años `1990/91`, `1991/92`, … pasan a una sola columna **`year`** (entero).
+- Estandariza nombres a minúsculas con guion bajo: `Country`→`country`, `Coffee type`→`type`, etc.
+- Control de calidad: tipos, nulos, duplicados.
 
-**2) Integración de precios**
-- Lee `precios.csv` (diario) y **anualiza** (p.ej., promedio por año calendario).
-- Hace **join** por año con el consumo limpio.
+### 2) Integración de **precios**
+- `precios.csv` (diario) → **anualización** (p.ej. promedio anual) y unión por **`year`**.
 
-**3) Variables de negocio (KPIs)**
-> Los supuestos de costos se ajustan al inicio del notebook. Cambia los parámetros para replicar tus cálculos.
-- **`revenue` (ingreso)**: `price * consumption` (ajusta unidades si tu consumo no está en la misma unidad de precio).
-- **`cost` (costo)**: función de costo configurable (p.ej., costo unitario * consumo).
-- **`profit` (utilidad)**: `revenue - cost`.
-- **`margin` (margen)**: `profit / revenue`.
-- **`market_share`**: participación por país/año respecto al total.
-- **CAGR**: tasa compuesta de crecimiento para consumo/ingresos por país.
+### 3) KPIs de negocio (cómo se calculan)
+> Tu EDA deja disponibles: `price`, `consumption`, **`revenue`**, **`profit`**, **`margin`**, **`market_share`**. Este es el código base para reproducirlos (idempotente: sólo calcula si falta la columna).
 
-**4) Visualización (presentación amigable)**
-- Tendencias por país/tipo; top países y participación.
-- Eje X con **todos los años** y **rotación 45°**.
-- **Etiquetas de datos** en barras/líneas cuando aplica.
+```python
+import pandas as pd
+df = df.copy()
+
+# 1) revenue = price * consumption
+if {"price","consumption"} <= set(df.columns) and "revenue" not in df.columns:
+    df["revenue"] = df["price"] * df["consumption"]
+
+# 2) profit: si no existe, permitir costo unitario configurable
+COST_PER_UNIT = None  # define tu costo; si None y ya existe 'profit', se respeta
+if "profit" not in df.columns:
+    if COST_PER_UNIT is None:
+        # Si no se especifica costo, asume 0 para reproducibilidad (ajusta según tu negocio)
+        df["profit"] = df["revenue"]
+    else:
+        df["profit"] = df["revenue"] - COST_PER_UNIT * df["consumption"]
+
+# 3) margin = profit / revenue (evitar división por cero)
+if "margin" not in df.columns and "revenue" in df.columns:
+    df["margin"] = df["profit"] / df["revenue"]
+    df.loc[~df["revenue"].replace({0: pd.NA}).notna(), "margin"] = pd.NA
+
+# 4) market_share: participación por año
+if "market_share" not in df.columns and {"year","consumption"} <= set(df.columns):
+    total_year = df.groupby("year")["consumption"].transform("sum")
+    df["market_share"] = df["consumption"] / total_year
+```
+
+### 4) Visualización
+- Series y barras por **país** y **tipo** (rotación de 45° en el eje X y etiquetas de datos).
 - Exporta figuras a `results/` (opcional).
-- **Guarda** `data/coffee_clean.csv` como dataset maestro.
+- Guarda dataset maestro en `data/coffee_clean.csv` para su uso en modelado.
 
 ---
 
-## 🧪 ¿Qué hace la Inferencia?
-El cuaderno **`Inferencia.ipynb`** arma un set de features simple pero extensible y entrena modelos por objetivo: `price`, `consumption`, `profit`.
+## 🧪 Inferencia — modelos por objetivo
 
-**Features base**
-- Numéricas: `year` (y opcionalmente rezagos/medias móviles del target).
-- Categóricas: `country`, `type` (one-hot encoding).
-
-**Partición temporal (sin leakage)**
-- División `train/val/test` respetando el tiempo (p.ej., 1994–2014 / 2015–2017 / 2018–2020).
-
-**Modelos**
-- **Baselines**: último valor, promedio histórico (referencia de negocio).
-- **Lineales penalizados**: Ridge / Lasso.
-- **No lineales**: RandomForest (y opcional **LightGBM/XGBoost** si están disponibles).
-
-**Métricas**
-- **MAE**, **RMSE**, **MAPE/sMAPE**, y **R²** cuando aplica.
-- Salida estandarizada a `predicciones/` y **artefactos** a `models/` (.joblib).
+**Objetivos:** `price`, `consumption`, `profit`  
+**Features base:** `year` (numérica), `country` y `type` (categóricas con one-hot).  
+**Partición temporal:** `train/val/test` respetando el tiempo (evita *leakage*).  
+**Modelos:** baselines (último valor/promedio), **Ridge**, **Lasso**, RandomForest.  
+**Métricas:** MAE, RMSE, (s)MAPE y R² cuando aplica.  
+**Artefactos:** se guardan en `models/` como `.joblib`.  
+**Predicciones:** se exportan a `predicciones/`.
 
 ---
 
-## 🧾 ¿Qué hace la Evaluación?
-El cuaderno **`Evaluacion.ipynb`** centraliza la **comparación de modelos** y el **holdout** del **último año** para cada objetivo.
+## 🧾 Evaluación — resultados reales del repo
 
-- Imprime un **resumen ejecutivo** por objetivo (métricas y n de validación).
-- Permite **predecir años futuros** (opcional) con el mejor pipeline.
-- Ejemplo de salida para `TARGET = "price"` (holdout 2020):
-  - `RMSE ≈ 37.93`, `MAE ≈ 37.92`, `sMAPE ≈ 29.27%`, `n_val = 55`, `year_val = 2020`.
-  - Interpretación: ~30% de error relativo es **aceptable para exploración**, pero **mejorable** para uso operativo.
-- Guarda predicciones y, si quieres, el modelo final en `models/`.
+**Holdout (último año = 2020) para `TARGET = "price"` con el mejor artefacto:**  
+- **Artifact elegido:** `lasso_price.joblib`  
+- **Métricas (2020):**
+  - **RMSE:** `11.8629`
+  - **MAE:** `7.8928`
+  - **sMAPE:** `7.0723%`
+  - **n_val:** `55`
+- **Predicciones generadas:** `shape = (1760, 4)`
 
-> **Tip**: compara siempre contra baselines; si un modelo no bate al baseline, no es apto para producción.
+> Nota: estos valores son los **obtenidos en tu `Evaluacion.ipynb`**. Si cambias features o particiones, las métricas variarán. Mantén la comparación con baselines para validar mejora.
+
+### Celda para imprimir métricas
+```python
+print("📊 Métricas de evaluación para el objetivo:", TARGET.upper())
+for k, v in ev["metrics"].items():
+    if isinstance(v, float):
+        print(f"  {k:<8}: {v:,.4f}")
+    else:
+        print(f"  {k:<8}: {v}")
+```
 
 ---
 
-## 🚀 Cómo replicar en local
+## 🚀 Cómo replicar
 
-1) **Clonar e instalar**
+1) **Entorno**
 ```bash
-git clone https://github.com/wilwil186/Coffee.git
-cd Coffee
-python -m venv .venv && source .venv/bin/activate  # (Linux/Mac)
-# .venv\Scripts\activate                          # (Windows PowerShell)
+python -m venv .venv
+# Linux/Mac
+source .venv/bin/activate
+# Windows PowerShell
+# .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-2) **Ubicar datos fuente**
-- Coloca `coffee_db.csv` y `precios.csv` en el raíz del repo (o ajusta rutas en los notebooks).
+2) **Orden recomendado**
+- Ejecuta `EDA.ipynb` → genera `data/coffee_clean.csv` y figuras.
+- Ejecuta `Inferencia.ipynb` → entrena y guarda artefactos/predicciones.
+- Ejecuta `Evaluacion.ipynb` → imprime métricas finales, elige mejor modelo y puede predecir años futuros.
 
-3) **Ejecutar cuadernos (orden recomendado)**
-- `EDA.ipynb` → genera `data/coffee_clean.csv` y figuras.
-- `Inferencia.ipynb` → entrena modelos y guarda predicciones/artefactos.
-- `Evaluacion.ipynb` → imprime métricas finales y genera predicciones por año/país/tipo.
-
-> Si usas VSCode/Jupyter, asegúrate de seleccionar el *kernel* de la venv.
+3) **Datos**
+- Ubica `coffee_db.csv` y `precios.csv` en el raíz (o ajusta rutas en los cuadernos).
 
 ---
 
-## 📌 Preguntas de negocio que responde
-- **¿Cómo evolucionó el consumo por país y tipo (1990–2020)?**
-- **¿Cuál es la participación de mercado por país y su CAGR?**
-- **¿Qué variables explican mejor `price`, `consumption` y `profit`?**
-- **¿Qué esperamos para 2021–2022 (o el horizonte que definas)?**
+## 📈 Recomendaciones
+- Añadir **rezagos** y **medias móviles** del target y/o precio internacional.
+- Probar **ensembles gradientes** (XGBoost/LightGBM) con *time-series CV* (walk-forward).
+- Analizar **métricas por segmento** (país/tipo) para identificar dónde el modelo aporta más.
+- Documentar **supuestos de costos** usados para `profit` y verificar consistencia de unidades.
 
 ---
 
-## 📈 Recomendaciones y siguientes pasos
-- Incorporar **más señales**: macro (PIB, inflación), oferta (producción, clima), y **precios internacionales** del café (ICO).
-- **Ingeniería de atributos temporal**: rezagos/ventanas, shocks exógenos, festivos.
-- Probar **modelos de series** (Prophet/ARIMA) y **ensembles gradientes** (XGBoost/LightGBM).
-- Validación **time-series cross‑validation** (walk‑forward) para robustez.
-- Métricas **por segmento** (país/tipo) para priorizar mercados.
+## 🤖 BONUS — Analista Virtual (LLM)
+Prototipo de **chatbot interno** con RAG sobre:
+- Predicciones por país/tipo/año
+- KPIs (ingresos/utilidad/margen)
+- Resúmenes ejecutivos por mercado
+Respuesta en lenguaje natural para preguntas como: “**¿Pronóstico de consumo en Colombia 2025?**” o “**Top 5 países por margen en 2020**”.
 
 ---
 
-## 🤖 BONUS — Analista Virtual (IA Generativa/LLM)
-Propuesta de un **chatbot interno** conectado a:
-- **Predicciones** por país/tipo/año
-- **KPIs de negocio** (ingresos, utilidad, margen)
-- **Notas del EDA** y supuestos
-Con **RAG** (Retrieval‑Augmented Generation) los equipos de ventas/estrategia consultan en lenguaje natural: *“¿Pronóstico de consumo en Colombia 2025?”*, *“Top 5 países por margen en 2020”*, o *“Resumen ejecutivo de Vietnam”*.
-- Entregables: endpoint REST + UI simple (Dash/Streamlit) + cuaderno de ejemplo.
-
----
-
-## ✅ Checklist de entrega
-- [x] **Análisis de la información (EDA)**
-- [x] **Solución analítica con modelos (Inferencia)**
-- [x] **Implementación y evaluación (Evaluacion)**
-- [x] **Presentación de resultados (este README + figuras)**
-- [ ] *(Bonus opcional)* **Prototipo LLM/Chatbot**
-
----
-
-## 📝 Notas de reproducibilidad
-- Se fijan *random seeds* donde aplica.
-- Las rutas de salida (`data/`, `models/`, `predicciones/`, `results/`) se crean si no existen.
-- Los notebooks lanzan mensajes claros ante columnas faltantes o esquemas distintos.
+## ✅ Checklist
+- [x] EDA con KPIs y dataset limpio
+- [x] Modelos por objetivo
+- [x] Evaluación con holdout (2020) y artefacto óptimo
+- [x] Presentación (README) y guías de ejecución
+- [ ] BONUS LLM (prototipo)
 
 ---
 
 ## Licencia
-Uso académico/demostrativo. Ajusta según tu necesidad.
+Uso académico/demostrativo.
