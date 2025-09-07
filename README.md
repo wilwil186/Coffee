@@ -1,124 +1,138 @@
-# High Garden Coffee — Analítica y ML para consumo, precio y utilidad
+# High Garden Coffee — **Presentación de Resultados** (Reto Técnico ML)
 
-> Proyecto de machine learning e inteligencia de negocios para una exportadora internacional de café. Cubre EDA, modelado supervisado (consumo, precio y utilidad) y evaluación reproducible.
+> Solución de analítica y machine learning para la empresa **Garden Coffee**: EDA, modelado supervisado (consumo, precio, utilidad), evaluación rigurosa y demo en app. Este documento se centra en **presentar los resultados** del modelado y cómo reproducirlos.
 
 ---
 
-## 🎯 Objetivo
-Aprovechar el set de datos histórico (1990–2020) de consumo y precios para:
-- **Entender** la evolución por **país** y **tipo de café** (EDA + KPIs).
-- **Predecir** variables clave a nivel anual: **consumo (tazas)**, **precio** y **utilidad**.
-- **Evaluar** rigurosamente los modelos con **partición temporal** y métricas estándar.
-- **Entregar** artefactos y un flujo reproducible para despliegue y toma de decisiones.
+## 🎯 Objetivo del reto
+Usar el histórico (1990–2020) de consumo (tazas), países y tipos de café para:
+- Analizar la información y formular KPI de negocio (ingresos, costos, utilidad, margen).
+- Construir y evaluar modelos que **predigan** consumo, precio y utilidad anual.
+- Entregar **artefactos** de modelo y un flujo reproducible con una **demo** en app.
 
-## 🧰 Estructura del repo
-```text
-.
-├── EDA.ipynb                # Limpieza, unificación, KPIs de negocio y gráficos
-├── Inferencia.ipynb         # Features (rezagos, MAs), entrenamiento y predicción (sin gráficos)
-├── Evaluacion.ipynb         # Comparación de modelos y holdout del último año
-├── utils/
-│   ├── io.py                # Utilidades de I/O y reshape (wide→long, detección automática)
-│   └── metrics.py           # Métricas de negocio y evaluación (MAE, RMSE, sMAPE, etc.)
-├── data/
-│   └── coffee_clean.csv     # Salida de EDA (normalizado y enriquecido)
-├── models/                  # Artefactos .joblib (uno por objetivo)
-├── predicciones/            # Predicciones del set de test y/o futuro
-├── results/                 # Tablas/figuras de resultados
-├── coffee_db.csv            # Datos de consumo por país/tipo (formato ancho)
-├── precios.csv              # Precios diarios (se anualizan en EDA)
-└── requirements.txt         # Dependencias del proyecto
-```
+> Alineado a los mínimos de la prueba: análisis, solución analítica, implementación y evaluación, y **presentación de resultados** (ver PDF del reto).
 
-## 📦 Datos y supuestos
-- **`coffee_db.csv`**: columnas `Country`, `Coffee type` y años tipo `1990/91`… que se normalizan a columna `year`.
-- **`precios.csv`**: precios diarios del café; se **agregan a promedio anual** y se integran por país/tipo.
-- **KPIs de negocio** calculados en `EDA.ipynb` (puedes ajustar supuestos al inicio del notebook):
-  - **Ingresos** = precio anual * consumo.
-  - **Costos** (supuesto parametrizable): costo unitario * consumo.
-  - **Utilidad** = ingresos − costos.
-  - **Margen**, **CAGR**, **participación** por país/tipo, etc.
+---
 
-## 🔁 Flujo de trabajo reproducible
-1) **Crear entorno**
+## 🧰 Datos y alcance
+- **`data/coffee_clean.csv`**: dataset anual por `country` y `type` con consumo (tazas) y precio anualizado.
+- **Horizonte**: 1990–2020 (holdout = último año disponible).
+- **KPI de negocio** (calculados en EDA): ingresos (= precio × consumo), costos (parametrizable), utilidad (= ingresos − costos), margen, CAGR, participación por país/tipo.
+
+---
+
+## 🧪 Metodología (resumen)
+- **Partición temporal**: `train / val / test` con holdout del último año, evitando leakage.
+- **Features**: rezagos y medias móviles (solo pasado), codificación por país y tipo.
+- **Modelos**: baselines (último valor, promedio histórico) y modelos supervisados (Ridge, Lasso, **RandomForest**).
+- **Métricas**: MAE, RMSE, **sMAPE** y n de observaciones por split.
+- **Artefactos**: se guardan en `models/` como `.joblib` (uno por objetivo).
+
+---
+
+## 📈 Resultados de prueba (run actual)
+Entrenamiento/evaluación realizado desde el notebook **`Inferencia_patched.ipynb`**. En validación, el mejor modelo para los tres objetivos fue **RandomForest**; abajo se reporta desempeño en **test** (n_test = 55).
+
+### 🔹 `price` (precio anual)
+- **Mejor modelo**: rf (validación MAE = 10.0550)
+- **Test**: **RMSE = 0.8500**, **MAE = 0.8500**, **sMAPE = 0.383%**, **n_test = 55**
+- **Artefacto**: `models/price_model.joblib`
+
+### 🔹 `consumption` (tazas/año)
+- **Mejor modelo**: rf (validación MAE = 1,545,649.7304)
+- **Test**: **RMSE = 5,270,065.0822**, **MAE = 2,021,107.0803**, **sMAPE = 1.547%**, **n_test = 55**
+- **Artefacto**: `models/consumption_model.joblib`
+
+### 🔹 `profit` (utilidad anual)
+- **Mejor modelo**: rf (validación MAE = 819,023,721.3023)
+- **Test**: **RMSE = 1,236,075,648.5734**, **MAE = 376,286,684.7858**, **sMAPE = 4.984%**, **n_test = 55**
+- **Artefacto**: `models/profit_model.joblib`
+
+> **Lectura ejecutiva**: Los sMAPE bajos (≲5%) en los tres objetivos indican **buen ajuste relativo** a la escala de cada variable. Para negocio, esto habilita estimaciones anuales de precio, consumo y utilidad con errores esperados acotados, útiles para planeación y escenarios por país/tipo.
+
+---
+
+## 🧪 Validación y buenas prácticas
+- Comparación contra **baselines** (último valor y promedio histórico) para dimensionar la ganancia del modelo.
+- **Holdout temporal** del año más reciente y features 100% causales.
+- Reporte de **n** por split y por segmento (país/tipo) cuando aplique.
+- Artefactos versionados y reproducibles con `requirements.txt` y notebooks.
+
+---
+
+## 🔁 Reproducibilidad (paso a paso)
+1) Crear entorno e instalar dependencias
 ```bash
-python -m venv .venv && source .venv/bin/activate   # en Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-2) **EDA** (`EDA.ipynb`)
-- Limpia y **normaliza años** (p.ej. `1990/91` → `year=1991`).
-- Une con `precios.csv` **anualizado**.
-- Genera visualizaciones con **todos los años en el eje X (rotación 45°)** y **etiquetas de datos**.
-- Exporta `data/coffee_clean.csv`.
+2) EDA y KPIs (opcional si ya existe `data/coffee_clean.csv`)
+- Ejecuta `EDA.ipynb` para limpiar, anualizar precios y exportar `data/coffee_clean.csv`.
 
-3) **Modelado e inferencia** (`Inferencia.ipynb`)
-- Construcción de **features**: rezagos (solo pasado), medias móviles, dummies de `country` y `type`.
-- **Partición temporal**: `train/val/test` (sin leakage; holdout = último año disponible).
-- Modelos probados: **baselines** (último valor, promedio histórico), **Ridge**, **Lasso**, **RandomForest** (opcional: LightGBM/XGBoost si están instalados).
-- Métricas: **MAE**, **RMSE**, **MAPE**, **sMAPE**, **R²**.
-- Guarda artefactos en `models/` y predicciones en `predicciones/`.
+3) Entrenar y evaluar
+- Ejecuta `Inferencia_patched.ipynb` (o `Inferencia.ipynb`). Al finalizar se guardan:
+  - `models/price_model.joblib`
+  - `models/consumption_model.joblib`
+  - `models/profit_model.joblib`
+- Las predicciones de test/futuro se dejan en `predicciones/` y tablas en `results/` (si aplica).
 
-4) **Evaluación** (`Evaluacion.ipynb`)
-- Centraliza la **comparación de modelos** por objetivo y el **holdout** del año más reciente.
-- Imprime un **resumen ejecutivo** por objetivo (métricas + n de validación).
-- Permite cargar un artefacto y **predecir años futuros** con intervalos simples (PI80/PI95 absolutos).
+4) Demo (app)
+- Sigue **[guiaApp.md](./guiaApp.md)** para correr `app.py` (usa Google AI Studio API).
 
-## 📊 Resultados (corte actual del repo)
-**Holdout 2020 — target = `price`**
+---
 
-| Modelo | Artefacto | RMSE | MAE | sMAPE (%) | n_val |
-|---|---|---:|---:|---:|---:|
-| Lasso | `models/lasso_price.joblib` | **5.4913** | **3.9316** | **3.5788** | **52** |
-
-
-Si ya corriste `Inferencia.ipynb` para **consumption** y **profit**, agrega aquí sus tablas con las métricas análogas (RMSE/MAE/sMAPE/R²) y los artefactos elegidos.
-
-## 🧪 Métricas y validación
-- Comparación contra **baselines** (último valor, promedio histórico) para dimensionar ganancias.
-- **Partición temporal** y **features causales** (sin usar futuro) para evitar leakage.
-- Reporte de **número de observaciones** en validación (`n_val`) y resumen por **país**/**tipo** si aplica.
-
-## ⚙️ Uso de artefactos (predicción)
-Ejemplo de uso programático de un artefacto `.joblib` con intervalos absolutos:
+## 🧩 Uso de artefactos (snippet)
+Para cargar un artefacto y predecir sobre nuevos datos con los mismos features:
 ```python
 from joblib import load
-from utils.io import build_xy  # misma lógica que en entrenamiento
+import pandas as pd
 
-art = load("models/lasso_price.joblib")
-mdl = art["model"]
+art = load("models/price_model.joblib")
+model = art["model"]
 y_col = art.get("y_col", "price")
 feat_cols = art["feat_cols"]
-q80, q95 = art.get("PI80_abs", 0.0), art.get("PI95_abs", 0.0)
 
-X_new, _, _ = build_xy(df_new, y_col)   # respeta ingeniería de features
-preds = mdl.predict(X_new.dropna())
-
-out = df_new.loc[X_new.dropna().index, ["year", *art.get("group_cols", ["country","type"]) ]].copy()
-out[f"pred_{y_col}"] = preds
-out[f"pred_{y_col}_lo80"] = preds - q80
-out[f"pred_{y_col}_hi80"] = preds + q80
-out[f"pred_{y_col}_lo95"] = preds - q95
-out[f"pred_{y_col}_hi95"] = preds + q95
+# df_new debe tener las mismas columnas de features
+X_new = df_new[feat_cols].dropna()
+df_pred = df_new.loc[X_new.index, ["year","country","type"]].copy()
+yhat = model.predict(X_new)
+df_pred[f"pred_{y_col}"] = yhat
 ```
 
-## 🧾 Cómo presentar (alineado a la prueba)
-- **Análisis de la información**: EDA con KPIs (ingresos, costos, margen, CAGR, share) y gráficos por país/tipo.
-- **Solución analítica**: pipelines de features + modelos supervisados por objetivo.
-- **Implementación y evaluación**: artefactos versionados (`models/`), partición temporal, métricas (RMSE/MAE/sMAPE/R²), comparación con baselines.
-- **Presentación de resultados**: tabla de métricas + resumen ejecutivo y predicciones exportables (`predicciones/`).
+---
 
 ## 💬 BONUS — Copiloto con LLM
-Propuesta de valor rápido:
-- **Chatbot “CoffeeCopilot”** (CLI/Gradio/Streamlit) que contesta:
-  - *“¿Cuál es el top-5 de países por crecimiento en 2010–2020?”*
-  - *“Muéstrame la proyección de precio para Colombia, tipo Robusta, 2021–2023.”*
-  - *“¿Qué factores más pesan en el modelo de precio?”* (explicabilidad básica)
-- Arquitectura sugerida: loader de artefactos + capa de consultas sobre `predicciones/` + plantilla RAG (FAQ de negocio) para respuestas citadas.
-- Seguridad: control de alcance (solo lectura de resultados) y registro de auditoría.
+Se incluye `app.py`, un **chatbot** que permite consultar métricas y predicciones de forma natural (por ejemplo: “proyección de precio para Colombia 2021–2023”). La guía de uso está en **[guiaApp.md](./guiaApp.md)** (API de Google AI Studio).
 
-## 🧩 Limitaciones y próximos pasos
-- **Imputación**: mejorar manejo de huecos y outliers antes de features.
-- **Modelos**: probar **LightGBM/XGBoost** y **prophet** para series por país/tipo.
-- **Intervalos**: PI dependientes de varianza del residuo por segmento (no solo absolutos).
-- **MLOps**: añadir pruebas, `dvc` para data/artefactos y CI para validar notebooks.
+---
+
+## ⚠️ Limitaciones y próximos pasos
+- Mejorar imputación/outliers antes de features.
+- Probar LightGBM/XGBoost y Prophet por segmento país×tipo.
+- Intervalos de predicción basados en varianza de residuales por segmento.
+- MLOps: `dvc` para versionar datos/modelos y CI para validar notebooks.
+
+---
+
+## 📂 Estructura relevante
+```
+.
+├── EDA.ipynb
+├── Inferencia.ipynb
+├── Inferencia_patched.ipynb
+├── app.py
+├── guiaApp.md
+├── data/coffee_clean.csv
+├── models/
+│   ├── price_model.joblib
+│   ├── consumption_model.joblib
+│   └── profit_model.joblib
+├── predicciones/
+└── results/
+```
+
+---
+
+## 📝 Licencia
+Este proyecto se publica bajo **GNU GPL v3**. Si vas a reutilizar código o modelos, mantén el aviso de licencia y comparte mejoras bajo los mismos términos.
