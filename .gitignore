@@ -1,2 +1,5 @@
 # Ignore InferenciasA directory
 InferenciasA/
+autogluon.ipynb
+AutogluonModels/
+data_autoglounmodels/   

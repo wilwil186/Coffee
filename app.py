@@ -27,9 +27,9 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Rutas de artifacts y datos**")
     data_clean = st.text_input("DATA_CLEAN", value=os.getenv("DATA_CLEAN", "data/coffee_clean.csv"))
-    art_price  = st.text_input("ART_PRICE",  value=os.getenv("ART_PRICE",  "models/lasso_price.joblib"))
-    art_cons   = st.text_input("ART_CONSUMPTION", value=os.getenv("ART_CONSUMPTION", "models/lasso_consumption.joblib"))
-    art_prof   = st.text_input("ART_PROFIT", value=os.getenv("ART_PROFIT", "models/lasso_profit.joblib"))
+    art_price  = st.text_input("ART_PRICE",  value=os.getenv("ART_PRICE",  "models/price_model.joblib"))
+    art_cons   = st.text_input("ART_CONSUMPTION", value=os.getenv("ART_CONSUMPTION", "models/consumption_model.joblib"))
+    art_prof   = st.text_input("ART_PROFIT", value=os.getenv("ART_PROFIT", "models/profit_model.joblib"))
 
     if st.button("🧹 Limpiar chat"):
         st.session_state.history = []
