@@ -3,3 +3,4 @@ numpy
 matplotlib
 scikit-learn
 joblib
+autogluon==1.4.0
